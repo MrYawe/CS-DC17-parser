@@ -50,10 +50,11 @@ func main() {
 	for rowIndex, row := range sheet.Rows {
 		if rowIndex != 0 {
 			line := ""
-			for _, cellID := range cellsUsefull {
+			for cellIndex, cellID := range cellsUsefull {
 				if cellID < len(row.Cells) {
-					line += cellParser(cellID, row.Cells[cellID]) + "|"
-				} else {
+					line += cellParser(cellID, row.Cells[cellID])
+				}
+				if cellIndex != len(cellsUsefull)-1 {
 					line += "|"
 				}
 			}
@@ -87,9 +88,36 @@ func cellParser(cellID int, cell *xlsx.Cell) (res string) {
 		s, _ := cell.String()
 		res = parseUTC(s)
 	case iPaperType:
-		res = "test"
+		s, _ := cell.String()
+		res = strconv.Itoa(parseDuration(s))
 	default:
 		res, _ = cell.String()
+	}
+
+	return
+}
+
+func parseDuration(paperType string) (res int) {
+	switch paperType {
+	case "Tutorial":
+		res = 120
+	case "Plenary talk":
+		res = 60
+	case "Invited talk":
+		res = 30
+	case "Advanced Introduction invited talk":
+		res = 30
+	case "New Result invited paper":
+		res = 30
+	case "Full paper":
+		res = 30
+	case "Short paper":
+		res = 15
+	case "Poster":
+		res = 5
+	default:
+		res = 0
+		fmt.Println("Paper type not found: " + paperType)
 	}
 
 	return
