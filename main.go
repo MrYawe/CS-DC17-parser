@@ -82,7 +82,7 @@ func main() {
 		}
 	}
 
-	lines[0] = fmt.Sprintf("%d|%d|%d", consCounter[0], consCounter[1], consCounter[2])
+	//lines[0] = fmt.Sprintf("%d|%d|%d", consCounter[0], consCounter[1], consCounter[2])
 
 	// Write file
 	outputFile, err := os.Create("result.txt")
