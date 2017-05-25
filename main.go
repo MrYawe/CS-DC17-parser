@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -64,7 +66,11 @@ func main() {
 					line := ""
 					for cellIndex, cellID := range cellsUsefull {
 						if cellID < len(row.Cells) {
-							line += cellParser(cellID, row.Cells[cellID], &consCounter)
+							data, err := cellParser(cellID, row.Cells[cellID], &consCounter)
+							if err != nil {
+								fmt.Printf("Error in sheet %s at line %d :\n%s\n", sheet.Name, rowIndex+1, err)
+							}
+							line += data
 						}
 						if cellIndex != len(cellsUsefull)-1 {
 							line += "|"
@@ -89,7 +95,9 @@ func main() {
 	}
 }
 
-func cellParser(cellID int, cell *xlsx.Cell, consCounter *[]int) (res string) {
+func cellParser(cellID int, cell *xlsx.Cell, consCounter *[]int) (string, error) {
+	var res string
+	var err error
 	switch cellID {
 	case iPaperID:
 		i, _ := cell.Int()
@@ -107,17 +115,20 @@ func cellParser(cellID int, cell *xlsx.Cell, consCounter *[]int) (res string) {
 		s, _ := cell.String()
 		res = strconv.Itoa(parseDuration(s))
 	case iConstraint1:
-		res, _ = cell.String()
+		s, _ := cell.String()
+		res, err = parseConstraint(s)
 		if res != "" {
 			(*consCounter)[0]++
 		}
 	case iConstraint2:
-		res, _ = cell.String()
+		s, _ := cell.String()
+		res, err = parseConstraint(s)
 		if res != "" {
 			(*consCounter)[1]++
 		}
 	case iConstraint3:
-		res, _ = cell.String()
+		s, _ := cell.String()
+		res, err = parseConstraint(s)
 		if res != "" {
 			(*consCounter)[2]++
 		}
@@ -126,7 +137,32 @@ func cellParser(cellID int, cell *xlsx.Cell, consCounter *[]int) (res string) {
 		res, _ = cell.String()
 	}
 
-	return
+	return res, err
+}
+
+func parseConstraint(cons string) (string, error) {
+	res := ""
+	cons = strings.Trim(cons, " ")
+	resultReg, _ := regexp.Compile(`\[(\d*):(\d*),(\d*):(\d*)\]`)
+	matches := resultReg.FindAllStringSubmatch(cons, -1)
+	if len(matches) > 0 || cons == "" {
+		res = cons
+		return res, nil
+	}
+
+	re1, _ := regexp.Compile(`\[(\d*),(\d*)\]`)
+	matches = re1.FindAllStringSubmatch(cons, -1)
+	for i, match := range matches {
+		res += fmt.Sprintf("[%s:00,%s:00]", match[1], match[2])
+		if i != len(matches)-1 {
+			res += ","
+		}
+	}
+	matches = resultReg.FindAllStringSubmatch(res, -1)
+	if len(matches) <= 0 {
+		return res, errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
+	}
+	return res, nil
 }
 
 func parseDuration(paperType string) (res int) {
