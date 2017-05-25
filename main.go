@@ -12,19 +12,31 @@ import (
 
 // Row
 const (
-	iSheetID = 1
+	/*
+		iFirstSheetID = 1
+		iLastSheetID  = 1
 
-	iPaperID = 0
-	//iPaperTitle   = 1
-	iTrackID = 2
-	//iTrackTile    = 3
-	iSessionID = 4
-	//iSessionTitle = 5
+		iPaperID = 0
+		iTrackID = 2
+		iSessionID = 4
+		iPaperType   = 25
+		iUTCTime     = 29
+		iConstraint1 = 30
+		iConstraint2 = 31
+		iConstraint3 = 32
+	*/
+
+	iFirstSheetID = 2
+	iLastSheetID  = 13
+
+	iPaperID     = 0
+	iTrackID     = 2
+	iSessionID   = 4
 	iPaperType   = 25
-	iUTCTime     = 29
-	iConstraint1 = 30
-	iConstraint2 = 31
-	iConstraint3 = 32
+	iUTCTime     = 32
+	iConstraint1 = 33
+	iConstraint2 = 34
+	iConstraint3 = 35
 )
 
 // id papier | id track | pleinier | session | duree | utc time | 3 contraintes
@@ -36,44 +48,48 @@ func main() {
 		log.Fatal(err)
 	}
 
+	cellsUsefull := []int{
+		iPaperID, iTrackID, iSessionID,
+		iPaperType, iUTCTime, iConstraint1, iConstraint2, iConstraint3,
+	}
+	lines := make([]string, 1)
+	consCounter := make([]int, 3)
+
+	for sheetIndex := iFirstSheetID; sheetIndex <= iLastSheetID; sheetIndex++ {
+		sheet := xlFile.Sheets[sheetIndex]
+		for rowIndex, row := range sheet.Rows {
+			if len(row.Cells) > 0 {
+				paperID, _ := row.Cells[iPaperID].Int()
+				if rowIndex != 0 && paperID >= 0 {
+					line := ""
+					for cellIndex, cellID := range cellsUsefull {
+						if cellID < len(row.Cells) {
+							line += cellParser(cellID, row.Cells[cellID], &consCounter)
+						}
+						if cellIndex != len(cellsUsefull)-1 {
+							line += "|"
+						}
+					}
+					lines = append(lines, line)
+				}
+			}
+		}
+	}
+
+	lines[0] = fmt.Sprintf("%d|%d|%d", consCounter[0], consCounter[1], consCounter[2])
+
+	// Write file
 	outputFile, err := os.Create("result.txt")
 	if err != nil {
 		log.Fatal("Cannot create file", err)
 	}
 	defer outputFile.Close()
-
-	cellsUsefull := []int{
-		iPaperID, iTrackID, iSessionID,
-		iPaperType, iUTCTime, iConstraint1, iConstraint2, iConstraint3,
+	for _, line := range lines {
+		fmt.Fprintf(outputFile, "%s\n", line)
 	}
-	sheet := xlFile.Sheets[iSheetID]
-	for rowIndex, row := range sheet.Rows {
-		if rowIndex != 0 {
-			line := ""
-			for cellIndex, cellID := range cellsUsefull {
-				if cellID < len(row.Cells) {
-					line += cellParser(cellID, row.Cells[cellID])
-				}
-				if cellIndex != len(cellsUsefull)-1 {
-					line += "|"
-				}
-			}
-			fmt.Fprintf(outputFile, "%s\n", line)
-		}
-	}
-
-	// for _, sheet := range xlFile.Sheets {
-	// 	for _, row := range sheet.Rows {
-	// 		for _, cell := range row.Cells {
-	// 			text, _ := cell.String()
-	// 			fmt.Printf("%s\n", text)
-	// 		}
-	// 	}
-	// }
-
 }
 
-func cellParser(cellID int, cell *xlsx.Cell) (res string) {
+func cellParser(cellID int, cell *xlsx.Cell, consCounter *[]int) (res string) {
 	switch cellID {
 	case iPaperID:
 		i, _ := cell.Int()
@@ -85,11 +101,27 @@ func cellParser(cellID int, cell *xlsx.Cell) (res string) {
 		i, _ := cell.Int()
 		res = strconv.Itoa(i)
 	case iUTCTime:
-		s, _ := cell.String()
-		res = parseUTC(s)
+		res, _ = cell.String()
+		//res = parseUTC(s)
 	case iPaperType:
 		s, _ := cell.String()
 		res = strconv.Itoa(parseDuration(s))
+	case iConstraint1:
+		res, _ = cell.String()
+		if res != "" {
+			(*consCounter)[0]++
+		}
+	case iConstraint2:
+		res, _ = cell.String()
+		if res != "" {
+			(*consCounter)[1]++
+		}
+	case iConstraint3:
+		res, _ = cell.String()
+		if res != "" {
+			(*consCounter)[2]++
+		}
+
 	default:
 		res, _ = cell.String()
 	}
@@ -110,6 +142,8 @@ func parseDuration(paperType string) (res int) {
 	case "New Result invited paper":
 		res = 30
 	case "Full paper":
+		res = 30
+	case "Young researcher":
 		res = 30
 	case "Short paper":
 		res = 15
