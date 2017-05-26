@@ -140,29 +140,63 @@ func cellParser(cellID int, cell *xlsx.Cell, consCounter *[]int) (string, error)
 	return res, err
 }
 
+func checkConstraint(cons string) error {
+	resultReg, _ := regexp.Compile(`\[(\d*):(\d*),(\d*):(\d*)\]`)
+	matches := resultReg.FindAllStringSubmatch(cons, -1)
+
+	for _, match := range matches {
+		v1, err1 := strconv.Atoi(match[1])
+		v2, err2 := strconv.Atoi(match[3])
+		if err1 != nil || err2 != nil || v1 > v2 {
+			return errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
+		}
+	}
+	return nil
+}
+
+func replaceConstraint(cons string) string {
+	resultReg, _ := regexp.Compile(`24:00`)
+	matches := resultReg.FindAllStringSubmatch(cons, -1)
+	res := resultReg.ReplaceAllLiteralString(cons, "23:59")
+	if len(matches) > 0 {
+		//fmt.Println(cons + " replaced by" + res)
+	}
+	return res
+}
+
 func parseConstraint(cons string) (string, error) {
 	res := ""
 	cons = strings.Trim(cons, " ")
+	var err error
+	valid := false
+
 	resultReg, _ := regexp.Compile(`\[(\d*):(\d*),(\d*):(\d*)\]`)
 	matches := resultReg.FindAllStringSubmatch(cons, -1)
 	if len(matches) > 0 || cons == "" {
 		res = cons
-		return res, nil
+		valid = true
 	}
 
-	re1, _ := regexp.Compile(`\[(\d*),(\d*)\]`)
-	matches = re1.FindAllStringSubmatch(cons, -1)
-	for i, match := range matches {
-		res += fmt.Sprintf("[%s:00,%s:00]", match[1], match[2])
-		if i != len(matches)-1 {
-			res += ","
+	if !valid {
+		re1, _ := regexp.Compile(`\[(\d*),(\d*)\]`)
+		matches = re1.FindAllStringSubmatch(cons, -1)
+		for i, match := range matches {
+			res += fmt.Sprintf("[%s:00,%s:00]", match[1], match[2])
+			if i != len(matches)-1 {
+				res += ","
+			}
+		}
+		matches = resultReg.FindAllStringSubmatch(res, -1)
+		if len(matches) <= 0 {
+			err = errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
 		}
 	}
-	matches = resultReg.FindAllStringSubmatch(res, -1)
-	if len(matches) <= 0 {
-		return res, errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
+
+	res = replaceConstraint(res)
+	if err == nil {
+		err = checkConstraint(res)
 	}
-	return res, nil
+	return res, err
 }
 
 func parseDuration(paperType string) (res int) {
