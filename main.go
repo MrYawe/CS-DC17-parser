@@ -167,29 +167,39 @@ func replaceConstraint(cons string) string {
 func parseConstraint(cons string) (string, error) {
 	res := ""
 	cons = strings.Trim(cons, " ")
-	var err error
-	valid := false
-
-	resultReg, _ := regexp.Compile(`\[(\d*):(\d*),(\d*):(\d*)\]`)
-	matches := resultReg.FindAllStringSubmatch(cons, -1)
-	if len(matches) > 0 || cons == "" {
-		res = cons
-		valid = true
+	if cons == "" {
+		return cons, nil
 	}
 
-	if !valid {
-		re1, _ := regexp.Compile(`\[(\d*),(\d*)\]`)
-		matches = re1.FindAllStringSubmatch(cons, -1)
-		for i, match := range matches {
-			res += fmt.Sprintf("[%s:00,%s:00]", match[1], match[2])
-			if i != len(matches)-1 {
-				res += ","
-			}
+	var err error
+
+	// Add 13 -> 13:00 to res
+	re1, _ := regexp.Compile(`\[(\d*),(\d*)\]`)
+	matches := re1.FindAllStringSubmatch(cons, -1)
+	for i, match := range matches {
+		res += fmt.Sprintf("[%s:00,%s:00]", match[1], match[2])
+		if i != len(matches)-1 {
+			res += ","
 		}
-		matches = resultReg.FindAllStringSubmatch(res, -1)
-		if len(matches) <= 0 {
-			err = errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
+	}
+
+	// Add to 13:54 res
+	resultReg, _ := regexp.Compile(`\[(\d*):(\d*),(\d*):(\d*)\]`)
+	matches = resultReg.FindAllStringSubmatch(cons, -1)
+	for i, match := range matches {
+		if i == 0 && res != "" {
+			res += ","
 		}
+		res += fmt.Sprintf("[%s:%s,%s:%s]", match[1], match[2], match[3], match[4])
+		if i != len(matches)-1 {
+			res += ","
+		}
+	}
+
+	// Check res
+	matches = resultReg.FindAllStringSubmatch(res, -1)
+	if len(matches) <= 0 {
+		err = errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
 	}
 
 	res = replaceConstraint(res)
