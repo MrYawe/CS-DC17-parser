@@ -42,7 +42,7 @@ const (
 )
 
 // id papier | id track | pleinier | session | duree | utc time | 3 contraintes
-
+// cp ~/go/src/github.com/mryawe/opti-stochastique-CS-DC17-parser/result.txt ./papers.txt
 func main() {
 	excelFileName := "./data.xlsx"
 	xlFile, err := xlsx.OpenFile(excelFileName)
@@ -116,19 +116,19 @@ func cellParser(cellID int, cell *xlsx.Cell, consCounter *[]int) (string, error)
 		res = strconv.Itoa(parseDuration(s))
 	case iConstraint1:
 		s, _ := cell.String()
-		res, err = parseConstraint(s)
+		res, err = parseConstraints(s)
 		if res != "" {
 			(*consCounter)[0]++
 		}
 	case iConstraint2:
 		s, _ := cell.String()
-		res, err = parseConstraint(s)
+		res, err = parseConstraints(s)
 		if res != "" {
 			(*consCounter)[1]++
 		}
 	case iConstraint3:
 		s, _ := cell.String()
-		res, err = parseConstraint(s)
+		res, err = parseConstraints(s)
 		if res != "" {
 			(*consCounter)[2]++
 		}
@@ -140,21 +140,7 @@ func cellParser(cellID int, cell *xlsx.Cell, consCounter *[]int) (string, error)
 	return res, err
 }
 
-func checkConstraint(cons string) error {
-	resultReg, _ := regexp.Compile(`\[(\d*):(\d*),(\d*):(\d*)\]`)
-	matches := resultReg.FindAllStringSubmatch(cons, -1)
-
-	for _, match := range matches {
-		v1, err1 := strconv.Atoi(match[1])
-		v2, err2 := strconv.Atoi(match[3])
-		if err1 != nil || err2 != nil || v1 > v2 {
-			return errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
-		}
-	}
-	return nil
-}
-
-func replaceConstraint(cons string) string {
+func checkConstraintMidnight(cons string) string {
 	resultReg, _ := regexp.Compile(`24:00`)
 	matches := resultReg.FindAllStringSubmatch(cons, -1)
 	res := resultReg.ReplaceAllLiteralString(cons, "23:59")
@@ -164,49 +150,83 @@ func replaceConstraint(cons string) string {
 	return res
 }
 
-func parseConstraint(cons string) (string, error) {
-	res := ""
-	cons = strings.Trim(cons, " ")
+func parseConstraints(cons string) (res string, err error) {
+	var errs []error
+	var constraints []string
+
+	reg, _ := regexp.Compile(`\[\d*:?\d*,\d*:?\d*\]`)
+	matches := reg.FindAllString(cons, -1)
+
+	for _, match := range matches {
+		fmt.Println(match)
+		c0 := strings.Trim(match, " ")
+		if c0 != "" {
+			c1, e := checkConstraintFormat(c0)
+			if e != nil {
+				errs = append(errs, e)
+				constraints = append(constraints, c1)
+				break
+			}
+
+			c2 := checkConstraintMidnight(c1)
+			c3, e := checkConstraintValue(c2)
+			if e != nil {
+				errs = append(errs, e)
+			}
+			constraints = append(constraints, c3)
+		}
+	}
+	for i, cons := range constraints {
+		res += cons
+		if i != len(constraints)-1 {
+			res += ","
+		}
+	}
+
+	errString := ""
+	for _, e := range errs {
+		errString += e.Error() + "\n"
+	}
+	if errString != "" {
+		err = errors.New(errString)
+	}
+
+	return
+}
+
+func checkConstraintValue(cons string) (string, error) {
+	resultReg, _ := regexp.Compile(`\[(\d*):(\d*),(\d*):(\d*)\]`)
+	match := resultReg.FindStringSubmatch(cons)
+
+	v1, err1 := strconv.Atoi(match[1])
+	v2, err2 := strconv.Atoi(match[3])
+	if err1 != nil || err2 != nil || v1 > v2 {
+		return cons, errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
+	}
+	return cons, nil
+}
+
+func checkConstraintFormat(cons string) (string, error) {
 	if cons == "" {
 		return cons, nil
 	}
 
-	var err error
-
-	// Add 13 -> 13:00 to res
-	re1, _ := regexp.Compile(`\[(\d*),(\d*)\]`)
-	matches := re1.FindAllStringSubmatch(cons, -1)
-	for i, match := range matches {
-		res += fmt.Sprintf("[%s:00,%s:00]", match[1], match[2])
-		if i != len(matches)-1 {
-			res += ","
-		}
-	}
-
-	// Add to 13:54 res
 	resultReg, _ := regexp.Compile(`\[(\d*):(\d*),(\d*):(\d*)\]`)
-	matches = resultReg.FindAllStringSubmatch(cons, -1)
-	for i, match := range matches {
-		if i == 0 && res != "" {
-			res += ","
-		}
-		res += fmt.Sprintf("[%s:%s,%s:%s]", match[1], match[2], match[3], match[4])
-		if i != len(matches)-1 {
-			res += ","
-		}
+	match := resultReg.FindStringSubmatch(cons)
+	if len(match) > 0 {
+		return cons, nil
 	}
 
-	// Check res
-	matches = resultReg.FindAllStringSubmatch(res, -1)
-	if len(matches) <= 0 {
-		err = errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
+	// 13 -> 13:00
+	reg, _ := regexp.Compile(`\[(\d*),(\d*)\]`)
+	match = reg.FindStringSubmatch(cons)
+	if len(match) > 0 {
+		res := fmt.Sprintf("[%s:00,%s:00]", match[1], match[2])
+		return res, nil
 	}
 
-	res = replaceConstraint(res)
-	if err == nil {
-		err = checkConstraint(res)
-	}
-	return res, err
+	err := errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
+	return cons, err
 }
 
 func parseDuration(paperType string) (res int) {
