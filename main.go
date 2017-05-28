@@ -57,12 +57,15 @@ func main() {
 	lines := make([]string, 1)
 	consCounter := make([]int, 3)
 
+	var sessions []string
+	papersCounter := 0
+
 	for sheetIndex := iFirstSheetID; sheetIndex <= iLastSheetID; sheetIndex++ {
 		sheet := xlFile.Sheets[sheetIndex]
 		for rowIndex, row := range sheet.Rows {
 			if len(row.Cells) > 0 {
 				paperID, _ := row.Cells[iPaperID].Int()
-				if rowIndex != 0 && paperID >= 0 {
+				if paperID >= 0 {
 					line := ""
 					for cellIndex, cellID := range cellsUsefull {
 						if cellID < len(row.Cells) {
@@ -71,6 +74,14 @@ func main() {
 								fmt.Printf("Error in sheet %s at line %d :\n%s\n", sheet.Name, rowIndex+1, err)
 							}
 							line += data
+
+							// Session counter
+							if cellID == iSessionID {
+								if !findSlice(sessions, data) {
+									sessions = append(sessions, data)
+								}
+							}
+
 						}
 						if cellIndex != len(cellsUsefull)-1 {
 							line += "|"
@@ -79,10 +90,11 @@ func main() {
 					lines = append(lines, line)
 				}
 			}
+			papersCounter++
 		}
 	}
 
-	//lines[0] = fmt.Sprintf("%d|%d|%d", consCounter[0], consCounter[1], consCounter[2])
+	lines[0] = fmt.Sprintf("%d|%d", papersCounter, len(sessions))
 
 	// Write file
 	outputFile, err := os.Create("result.txt")
@@ -93,6 +105,17 @@ func main() {
 	for _, line := range lines {
 		fmt.Fprintf(outputFile, "%s\n", line)
 	}
+}
+
+func findSlice(slice []string, elem string) bool {
+	found := false
+	for _, e := range slice {
+		if e == elem {
+			found = true
+			break
+		}
+	}
+	return found
 }
 
 func cellParser(cellID int, cell *xlsx.Cell, consCounter *[]int) (string, error) {
@@ -158,7 +181,6 @@ func parseConstraints(cons string) (res string, err error) {
 	matches := reg.FindAllString(cons, -1)
 
 	for _, match := range matches {
-		fmt.Println(match)
 		c0 := strings.Trim(match, " ")
 		if c0 != "" {
 			c1, e := checkConstraintFormat(c0)
