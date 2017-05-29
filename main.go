@@ -14,20 +14,6 @@ import (
 
 // Row
 const (
-	/*
-		iFirstSheetID = 1
-		iLastSheetID  = 1
-
-		iPaperID = 0
-		iTrackID = 2
-		iSessionID = 4
-		iPaperType   = 25
-		iUTCTime     = 29
-		iConstraint1 = 30
-		iConstraint2 = 31
-		iConstraint3 = 32
-	*/
-
 	iFirstSheetID = 2
 	iLastSheetID  = 13
 
@@ -41,10 +27,13 @@ const (
 	iConstraint3 = 35
 )
 
-// id papier | id track | pleinier | session | duree | utc time | 3 contraintes
-// cp ~/go/src/github.com/mryawe/opti-stochastique-CS-DC17-parser/result.txt ./papers.txt
+// Result format:
+// paper id | track id | session id | duration | utc time | constraint 1 | constraint 2 | constraint 3 |
 func main() {
-	excelFileName := "./data.xlsx"
+	if len(os.Args) != 2 {
+		log.Fatal("Usage ./CS-DC17-parser input.xls")
+	}
+	excelFileName := os.Args[1]
 	xlFile, err := xlsx.OpenFile(excelFileName)
 	if err != nil {
 		log.Fatal(err)
@@ -54,7 +43,7 @@ func main() {
 		iPaperID, iTrackID, iSessionID,
 		iPaperType, iUTCTime, iConstraint1, iConstraint2, iConstraint3,
 	}
-	lines := make([]string, 1)
+	var lines []string
 	consCounter := make([]int, 3)
 
 	var sessions []string
@@ -94,10 +83,8 @@ func main() {
 		}
 	}
 
-	lines[0] = fmt.Sprintf("%d|%d", papersCounter, len(sessions))
-
 	// Write file
-	outputFile, err := os.Create("result.txt")
+	outputFile, err := os.Create("papers.txt")
 	if err != nil {
 		log.Fatal("Cannot create file", err)
 	}
@@ -105,6 +92,8 @@ func main() {
 	for _, line := range lines {
 		fmt.Fprintf(outputFile, "%s\n", line)
 	}
+
+	fmt.Printf("%d papers and %d sessions parsed in papers.txt", papersCounter, len(sessions))
 }
 
 func findSlice(slice []string, elem string) bool {
