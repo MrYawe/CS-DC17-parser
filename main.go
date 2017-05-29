@@ -66,6 +66,7 @@ func main() {
 
 							// Session counter
 							if cellID == iSessionID {
+								papersCounter++
 								if !findSlice(sessions, data) {
 									sessions = append(sessions, data)
 								}
@@ -79,7 +80,6 @@ func main() {
 					lines = append(lines, line)
 				}
 			}
-			papersCounter++
 		}
 	}
 
@@ -168,6 +168,10 @@ func parseConstraints(cons string) (res string, err error) {
 
 	reg, _ := regexp.Compile(`\[\d*:?\d*,\d*:?\d*\]`)
 	matches := reg.FindAllString(cons, -1)
+	nonMatched := strings.Replace(reg.ReplaceAllString(cons, ""), ",", "", -1)
+	if strings.Trim(nonMatched, " ") != "" {
+		return "", errors.New("Can't parse the constraint: " + cons + "\nThe correct format is [hh:mm, hh:mm] or [hh, hh]\n")
+	}
 
 	for _, match := range matches {
 		c0 := strings.Trim(match, " ")
